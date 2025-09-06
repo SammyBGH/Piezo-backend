@@ -20,6 +20,7 @@ const io = new Server(server, {
 });
 
 const DATA_PATH = path.join(__dirname, 'data.json');
+const MAX_HISTORY = 1000; // keep last 1000 readings
 
 // ===== Helper to load stored data =====
 function loadDataArray() {
@@ -50,7 +51,6 @@ app.get('/api/data', (req, res) => {
 });
 
 // ===== API: Accept device POST =====
-// ESP32 should send: { steps, power, voltage, current }
 app.post('/api/data', (req, res) => {
   const reading = req.body;
 
@@ -70,7 +70,10 @@ app.post('/api/data', (req, res) => {
   try {
     const arr = loadDataArray();
     arr.push(normalized);
-    writeFileSync(DATA_PATH, JSON.stringify(arr, null, 2), 'utf-8');
+
+    // keep last MAX_HISTORY entries
+    const trimmed = arr.slice(-MAX_HISTORY);
+    writeFileSync(DATA_PATH, JSON.stringify(trimmed, null, 2), 'utf-8');
 
     // Emit to all connected clients
     io.emit('new-reading', normalized);
@@ -86,8 +89,9 @@ app.post('/api/data', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Client connected', socket.id);
 
-  // Initially send empty array (no simulator fallback)
-  socket.emit('initial-data', []);
+  // Send saved history on connect
+  const arr = loadDataArray().map(normalizeReading);
+  socket.emit('initial-data', arr);
 
   socket.on('disconnect', () => {
     console.log('Client disconnected', socket.id);
