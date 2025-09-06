@@ -27,56 +27,62 @@ mongoose.connect(MONGO_URI, {
 
 // ====== Schema & Model ======
 const ReadingSchema = new mongoose.Schema({
-  steps: Number,
-  power_mW: Number,
-  voltage_V: Number,
-  current_mA: Number,
+  steps: { type: Number, required: true },
+  power_mW: { type: Number, required: true },
+  voltage_V: { type: Number, required: true },
+  current_mA: { type: Number, required: true },
   timestamp: { type: Date, default: Date.now }
 });
+
 const Reading = mongoose.model('Reading', ReadingSchema);
 
 // ====== API: Get all readings ======
 app.get('/api/data', async (req, res) => {
   try {
-    const readings = await Reading.find()
-      .sort({ timestamp: 1 }); // oldest -> newest
+    const readings = await Reading.find().sort({ timestamp: 1 }); // oldest -> newest
     res.json({ success: true, data: readings });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Failed to fetch readings:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // ====== API: Post new reading ======
 app.post('/api/data', async (req, res) => {
-  const { steps, power, voltage, current, timestamp } = req.body;
-
-  if (
-    steps === undefined || 
-    power === undefined || 
-    voltage === undefined || 
-    current === undefined
-  ) {
-    return res.status(400).json({ success: false, message: 'Invalid reading format' });
-  }
-
-  const reading = new Reading({
-    steps: Number(steps),
-    power_mW: Number(power),
-    voltage_V: Number(voltage),
-    current_mA: Number(current),
-    timestamp: timestamp ? new Date(timestamp) : undefined
-  });
-
   try {
+    const { steps, power, voltage, current, timestamp } = req.body;
+
+    // Validate numeric inputs
+    const parsedSteps = Number(steps);
+    const parsedPower = Number(power);
+    const parsedVoltage = Number(voltage);
+    const parsedCurrent = Number(current);
+
+    if (
+      isNaN(parsedSteps) ||
+      isNaN(parsedPower) ||
+      isNaN(parsedVoltage) ||
+      isNaN(parsedCurrent)
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid numeric values' });
+    }
+
+    const reading = new Reading({
+      steps: parsedSteps,
+      power_mW: parsedPower,
+      voltage_V: parsedVoltage,
+      current_mA: parsedCurrent,
+      timestamp: timestamp ? new Date(timestamp) : undefined
+    });
+
     const saved = await reading.save();
 
-    // Emit to connected clients
+    // Emit live update to all connected clients
     io.emit('new-reading', saved);
 
     res.json({ success: true, data: saved });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Error saving reading:', err);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -85,12 +91,11 @@ app.post('/api/data', async (req, res) => {
 io.on('connection', async (socket) => {
   console.log('Client connected', socket.id);
 
-  // Send persisted history on connect
   try {
     const readings = await Reading.find().sort({ timestamp: 1 });
     socket.emit('initial-data', readings);
   } catch (err) {
-    console.error('Failed to fetch initial data for socket:', err);
+    console.error('❌ Failed to fetch initial data for socket:', err);
   }
 
   socket.on('disconnect', () => {
