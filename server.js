@@ -33,13 +33,19 @@ function loadDataArray() {
   }
 }
 
+// ===== Safe number parser =====
+function toNumberOrNull(val) {
+  const num = Number(val);
+  return isFinite(num) ? num : null;
+}
+
 // ===== Normalize keys for frontend =====
 function normalizeReading(reading) {
   return {
-    steps: Number(reading.steps) || 0,
-    power_mW: Number(reading.power) || 0,
-    voltage_V: Number(reading.voltage) || 0,
-    current_mA: Number(reading.current) || 0,
+    steps: toNumberOrNull(reading.steps),
+    power_mW: toNumberOrNull(reading.power),
+    voltage_V: toNumberOrNull(reading.voltage),
+    current_mA: toNumberOrNull(reading.current),
     timestamp: reading.timestamp || new Date().toISOString()
   };
 }
