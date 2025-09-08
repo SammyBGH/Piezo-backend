@@ -87,6 +87,35 @@ app.post('/api/data', async (req, res) => {
   }
 });
 
+// ====== API: Totals ======
+app.get('/api/totals', async (req, res) => {
+  try {
+    const totals = await Reading.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalSteps: { $sum: "$steps" },
+          avgPower: { $avg: "$power_mW" },
+          avgVoltage: { $avg: "$voltage_V" },
+          avgCurrent: { $avg: "$current_mA" }
+        }
+      }
+    ]);
+
+    if (!totals.length) {
+      return res.json({
+        success: true,
+        data: { totalSteps: 0, avgPower: 0, avgVoltage: 0, avgCurrent: 0 }
+      });
+    }
+
+    res.json({ success: true, data: totals[0] });
+  } catch (err) {
+    console.error('❌ Failed to fetch totals:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // ====== Socket.io connection ======
 io.on('connection', async (socket) => {
   console.log('Client connected', socket.id);
