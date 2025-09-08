@@ -95,6 +95,9 @@ app.get('/api/totals', async (req, res) => {
         $group: {
           _id: null,
           totalSteps: { $sum: "$steps" },
+          totalPower: { $sum: "$power_mW" },
+          totalVoltage: { $sum: "$voltage_V" },
+          totalCurrent: { $sum: "$current_mA" },
           avgPower: { $avg: "$power_mW" },
           avgVoltage: { $avg: "$voltage_V" },
           avgCurrent: { $avg: "$current_mA" }
@@ -105,7 +108,15 @@ app.get('/api/totals', async (req, res) => {
     if (!totals.length) {
       return res.json({
         success: true,
-        data: { totalSteps: 0, avgPower: 0, avgVoltage: 0, avgCurrent: 0 }
+        data: { 
+          totalSteps: 0, 
+          totalPower: 0, 
+          totalVoltage: 0, 
+          totalCurrent: 0, 
+          avgPower: 0, 
+          avgVoltage: 0, 
+          avgCurrent: 0 
+        }
       });
     }
 
