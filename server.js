@@ -52,17 +52,34 @@ app.post('/api/data', async (req, res) => {
   try {
     const { steps, power, voltage, current, timestamp } = req.body;
 
+    // Validate numeric inputs
+    const parsedSteps = Number(steps);
+    const parsedPower = Number(power);
+    const parsedVoltage = Number(voltage);
+    const parsedCurrent = Number(current);
+
+    if (
+      isNaN(parsedSteps) ||
+      isNaN(parsedPower) ||
+      isNaN(parsedVoltage) ||
+      isNaN(parsedCurrent)
+    ) {
+      return res.status(400).json({ success: false, message: 'Invalid numeric values' });
+    }
+
     const reading = new Reading({
-      steps: Number(steps),
-      power_mW: Number(power),
-      voltage_V: Number(voltage),
-      current_mA: Number(current),
+      steps: parsedSteps,
+      power_mW: parsedPower,
+      voltage_V: parsedVoltage,
+      current_mA: parsedCurrent,
       timestamp: timestamp ? new Date(timestamp) : undefined
     });
 
     const saved = await reading.save();
 
-    io.emit('new-reading', saved); // live update
+    // Emit live update to all connected clients
+    io.emit('new-reading', saved);
+
     res.json({ success: true, data: saved });
   } catch (err) {
     console.error('❌ Error saving reading:', err);
@@ -79,6 +96,8 @@ app.get('/api/totals', async (req, res) => {
           _id: null,
           totalSteps: { $sum: "$steps" },
           totalPower: { $sum: "$power_mW" },
+          totalVoltage: { $sum: "$voltage_V" },
+          totalCurrent: { $sum: "$current_mA" },
           avgPower: { $avg: "$power_mW" },
           avgVoltage: { $avg: "$voltage_V" },
           avgCurrent: { $avg: "$current_mA" }
@@ -89,7 +108,15 @@ app.get('/api/totals', async (req, res) => {
     if (!totals.length) {
       return res.json({
         success: true,
-        data: { totalSteps: 0, totalPower: 0, avgPower: 0, avgVoltage: 0, avgCurrent: 0 }
+        data: { 
+          totalSteps: 0, 
+          totalPower: 0, 
+          totalVoltage: 0, 
+          totalCurrent: 0, 
+          avgPower: 0, 
+          avgVoltage: 0, 
+          avgCurrent: 0 
+        }
       });
     }
 
@@ -100,39 +127,20 @@ app.get('/api/totals', async (req, res) => {
   }
 });
 
-// ====== API: Daily Breakdown ======
-app.get('/api/daily', async (req, res) => {
-  try {
-    const daily = await Reading.aggregate([
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
-          totalSteps: { $sum: "$steps" },
-          totalPower: { $sum: "$power_mW" },
-          avgVoltage: { $avg: "$voltage_V" },
-          avgCurrent: { $avg: "$current_mA" }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
-
-    res.json({ success: true, data: daily });
-  } catch (err) {
-    console.error('❌ Failed to fetch daily breakdown:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
 // ====== Socket.io connection ======
 io.on('connection', async (socket) => {
   console.log('Client connected', socket.id);
+
   try {
     const readings = await Reading.find().sort({ timestamp: 1 });
     socket.emit('initial-data', readings);
   } catch (err) {
     console.error('❌ Failed to fetch initial data for socket:', err);
   }
-  socket.on('disconnect', () => console.log('Client disconnected', socket.id));
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected', socket.id);
+  });
 });
 
 // ====== Start server ======
