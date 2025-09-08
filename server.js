@@ -127,6 +127,18 @@ app.get('/api/totals', async (req, res) => {
   }
 });
 
+// ====== API: Delete ALL readings ======
+app.delete('/api/delete-all', async (req, res) => {
+  try {
+    const result = await Reading.deleteMany({});
+    console.log(`🗑️ Deleted ${result.deletedCount} readings from MongoDB`);
+    res.json({ success: true, message: `Deleted ${result.deletedCount} readings` });
+  } catch (err) {
+    console.error('❌ Failed to delete all readings:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // ====== Socket.io connection ======
 io.on('connection', async (socket) => {
   console.log('Client connected', socket.id);
