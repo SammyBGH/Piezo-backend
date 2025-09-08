@@ -127,9 +127,16 @@ app.get('/api/totals', async (req, res) => {
   }
 });
 
-// ====== API: Delete ALL readings ======
+// ====== API: Delete ALL readings (protected) ======
 app.delete('/api/delete-all', async (req, res) => {
   try {
+    const { key } = req.query;
+
+    // simple protection with an ADMIN_KEY from environment variables
+    if (key !== process.env.ADMIN_KEY) {
+      return res.status(403).json({ success: false, message: "Unauthorized" });
+    }
+
     const result = await Reading.deleteMany({});
     console.log(`🗑️ Deleted ${result.deletedCount} readings from MongoDB`);
     res.json({ success: true, message: `Deleted ${result.deletedCount} readings` });
