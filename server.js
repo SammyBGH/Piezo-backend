@@ -7,16 +7,16 @@ const { Server } = require('socket.io');
 const app = express();
 const server = http.createServer(app);
 
-// ====== Socket.io ======
+
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// ====== Middleware ======
+
 app.use(cors());
 app.use(express.json());
 
-// ====== MongoDB ======
+
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI, { 
   useNewUrlParser: true, 
@@ -25,7 +25,7 @@ mongoose.connect(MONGO_URI, {
 .then(() => console.log('✅ Connected to MongoDB'))
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// ====== Schema & Model ======
+
 const ReadingSchema = new mongoose.Schema({
   steps: { type: Number, required: true },
   power_mW: { type: Number, required: true },
@@ -36,7 +36,7 @@ const ReadingSchema = new mongoose.Schema({
 
 const Reading = mongoose.model('Reading', ReadingSchema);
 
-// ====== API: Get all readings ======
+
 app.get('/api/data', async (req, res) => {
   try {
     const readings = await Reading.find().sort({ timestamp: 1 }); // oldest -> newest
@@ -47,12 +47,10 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
-// ====== API: Post new reading ======
 app.post('/api/data', async (req, res) => {
   try {
     const { steps, power, voltage, current, timestamp } = req.body;
 
-    // Validate numeric inputs
     const parsedSteps = Number(steps);
     const parsedPower = Number(power);
     const parsedVoltage = Number(voltage);
@@ -77,7 +75,6 @@ app.post('/api/data', async (req, res) => {
 
     const saved = await reading.save();
 
-    // Emit live update to all connected clients
     io.emit('new-reading', saved);
 
     res.json({ success: true, data: saved });
@@ -87,7 +84,7 @@ app.post('/api/data', async (req, res) => {
   }
 });
 
-// ====== API: Totals ======
+
 app.get('/api/totals', async (req, res) => {
   try {
     const totals = await Reading.aggregate([
@@ -127,12 +124,12 @@ app.get('/api/totals', async (req, res) => {
   }
 });
 
-// ====== API: Delete ALL readings (protected) ======
+
 app.delete('/api/delete-all', async (req, res) => {
   try {
     const { key } = req.query;
 
-    // simple protection with an ADMIN_KEY from environment variables
+    
     if (key !== process.env.ADMIN_KEY) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
@@ -146,7 +143,7 @@ app.delete('/api/delete-all', async (req, res) => {
   }
 });
 
-// ====== Socket.io connection ======
+
 io.on('connection', async (socket) => {
   console.log('Client connected', socket.id);
 
@@ -162,6 +159,5 @@ io.on('connection', async (socket) => {
   });
 });
 
-// ====== Start server ======
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
